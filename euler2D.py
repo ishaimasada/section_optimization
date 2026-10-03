@@ -15,7 +15,7 @@ Arrays are shaped (ni, nj, 4), matching euler.m's (i,j,:) indexing, with
 state order [rho, Vx, Vy, P] (primitive, V) or [u1,u2,u3,u4] (conservative, u).
 """
 import numpy as np
-import os
+import os, sys
 from types import SimpleNamespace
 import matplotlib
 matplotlib.use("Agg")
@@ -350,6 +350,10 @@ def plot_velocity_field(x, y, Vmag, wall, out_path):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        results_filename = sys.argv[1]
+    else:
+        results_filename = "velocity_field.png"
     V, history = run_solver()
 
     rho = V[..., 0]
@@ -367,6 +371,6 @@ if __name__ == "__main__":
     print("Saved solution to euler2D_solution.npz")
 
     os.makedirs(RESULTS_DIR, exist_ok=True)
-    vel_path = os.path.join(RESULTS_DIR, "velocity_field.png")
+    vel_path = os.path.join(RESULTS_DIR, results_filename)
     plot_velocity_field(x, y, Vmag, wall, vel_path)
     print(f"Saved velocity field plot to {vel_path}")

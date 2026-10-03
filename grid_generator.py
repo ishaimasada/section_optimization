@@ -8,7 +8,7 @@ R_FARFIELD chords. Periodic in xi (wraps around the body), Dirichlet in eta
 smoothing (SOR, red-black).
 """
 import numpy as np
-import os
+import os, sys
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -262,6 +262,8 @@ def plot(x, y, x0, y0, wall, fname="airfoil_ogrid.png"):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        output_filename = sys.argv[1]
     x, y, x0, y0, wall = generate()
-    plot(x, y, x0, y0, wall)
-    np.savez("airfoil_ogrid.npz", x=x, y=y, wall=wall)
+    plot(x, y, x0, y0, wall, fname=output_filename+".png")
+    np.savez(output_filename+".npz", x=x, y=y, wall=wall)

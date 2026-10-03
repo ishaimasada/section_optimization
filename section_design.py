@@ -1,3 +1,4 @@
+import sys
 from pyaero.aerodynamics.curves import *
 import matplotlib.pyplot as plt
 import numpy, json, os
@@ -128,11 +129,15 @@ filepath = os.path.abspath(__file__)
 directory = os.path.dirname(filepath)
 os.chdir(directory)
 
+if len(sys.argv) > 1:
+    parameter_filename = sys.argv[1]
+else:
+    parameter_filename = "parameters.json"
+
 # Load parameters from JSON file
-with open("parameters.json", "r") as file:
+with open(parameter_filename, "r") as file:
     parameters = json.load(file)
 
-LE_radius = parameters["annulus"]["LE hub"]
 section = parameters["sections"][0]
 
 # Curve Objects
@@ -155,10 +160,8 @@ lower_positions = numpy.asarray(copy.deepcopy(lower.positions))
 # LE
 camberline = [Panel(upper.positions[idx], lower.positions[idx]) for idx in range(upper.resolution)]
 camberline.extend([Panel(upper_end.positions[idx], lower.positions[idx+upper.resolution]) for idx in range(1, upper_end.resolution)])
-LE_hub_radius = parameters["annulus"]["LE hub"]
 LE_AR = section["LE AR"]
 alpha = numpy.deg2rad(section["inlet angle"])
-half_wedge = numpy.deg2rad(section["LE angle"])
 if LE_AR < 1: e = numpy.sqrt(1 - LE_AR**2)
 else: e = numpy.sqrt(1 - (1/LE_AR)**2)
 LE_x, LE_y, upper_cutoff_idx, lower_cutoff_idx = make_edge(LE_AR, alpha, camberline, upper, lower, side="LE")
