@@ -25,8 +25,16 @@ filepath = os.path.abspath(__file__)
 directory = os.path.dirname(filepath)
 os.chdir(directory)
 
+# argv[1]: output image filename (default "velocity_field.png")
+# argv[2]: grid .npz filename to load (default "airfoil_ogrid.npz") -- this
+# was previously hardcoded, so every call loaded the SAME grid file
+# regardless of which iteration's grid was meant to be solved on.
+results_filename = sys.argv[1] if len(sys.argv) > 1 else "velocity_field.png"
+grid_filename = sys.argv[2] if len(sys.argv) > 2 else "airfoil_ogrid.npz"
+
 # ---------------------------------------------------------------- Load grid
-with np.load("airfoil_ogrid.npz") as data:
+print(f"Loading grid from {grid_filename}")
+with np.load(grid_filename) as data:
     x, y, wall = data["x"], data["y"], data["wall"]
 ni, nj = x.shape
 print(f"Grid size: {ni} x {nj}")
@@ -202,7 +210,7 @@ if CFL > 1.8:
     raise ValueError("CFL number must be less than 1.8.")
 
 
-def run_solver(iterations=ITERATIONS, tolerance=TOLERANCE, verbose=True):
+def run_solver(iterations=ITERATIONS, tolerance=TOLERANCE, verbose=True, cfl=CFL):
     # ------------------------------------------------------ Initialization
     V0 = np.array([rho_inf, u_inf, v_inf, P_inf])
     V = np.tile(V0, (ni, nj, 1))
@@ -223,7 +231,7 @@ def run_solver(iterations=ITERATIONS, tolerance=TOLERANCE, verbose=True):
         Vc = Vx * eta_x[:, sl] + Vy * eta_y[:, sl]
         lambda_xi = np.abs(U) + a * np.sqrt(xi_x[:, sl]**2 + xi_y[:, sl]**2)
         lambda_eta = np.abs(Vc) + a * np.sqrt(eta_x[:, sl]**2 + eta_y[:, sl]**2)
-        dt = CFL / (lambda_xi + lambda_eta)   # shape (ni, nj-2)
+        dt = cfl / (lambda_xi + lambda_eta)   # shape (ni, nj-2)
 
         u_k, V_k = [None] * NUM_STAGES, [None] * NUM_STAGES
         residuals_n = np.zeros((ni, nj, 4))
@@ -324,6 +332,32 @@ def run_solver(iterations=ITERATIONS, tolerance=TOLERANCE, verbose=True):
     return V, np.array(history)
 
 
+def run_solver_robust(iterations=ITERATIONS, tolerance=TOLERANCE, verbose=True,
+                        cfl=CFL, max_backoffs=4, backoff_factor=0.5):
+    """Not every swept section design has the same stability margin -- some
+    shapes' grids are only marginally stable at a given CFL (e.g. this one:
+    residuals peak much higher and decay much slower than the baseline
+    design did), so a FloatingPointError (NaN/Inf from a diverging solve)
+    doesn't necessarily mean something is wrong with that design -- it can
+    just need a lower CFL. On divergence, halve the CFL and restart from
+    scratch, up to max_backoffs times, rather than failing the whole batch
+    run or requiring per-design manual tuning."""
+    attempt_cfl = cfl
+    for attempt in range(max_backoffs + 1):
+        try:
+            return run_solver(iterations=iterations, tolerance=tolerance,
+                               verbose=verbose, cfl=attempt_cfl)
+        except FloatingPointError:
+            if attempt == max_backoffs:
+                print(f"Still diverging after {max_backoffs} CFL backoffs "
+                      f"(last tried CFL={attempt_cfl:.4f}); giving up on this design.")
+                raise
+            attempt_cfl *= backoff_factor
+            print(f"Diverged at CFL={attempt_cfl / backoff_factor:.4f}; "
+                  f"retrying from scratch with CFL={attempt_cfl:.4f} "
+                  f"(backoff {attempt + 1}/{max_backoffs}).")
+
+
 RESULTS_DIR = "results"
 
 
@@ -350,11 +384,7 @@ def plot_velocity_field(x, y, Vmag, wall, out_path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        results_filename = sys.argv[1]
-    else:
-        results_filename = "velocity_field.png"
-    V, history = run_solver()
+    V, history = run_solver_robust()
 
     rho = V[..., 0]
     Vx = V[..., 1]

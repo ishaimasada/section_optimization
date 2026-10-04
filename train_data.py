@@ -104,4 +104,4 @@ for i in range(num_samples):
     subprocess.run(["python", grid_generator_filename, f"airfoil_ogrid{i}"])
 
     # Run the solver to obtain results
-    subprocess.run(["python", solver_filename, f"velocity_field{i}.png"])
+    subprocess.run(["python", solver_filename, f"velocity_field{i}.png", f"airfoil_ogrid{i}.npz"])
